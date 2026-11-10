@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ledgerline-ap-agent
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/config
+    envVars:
+      - key: GEMINI_API_KEY      # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+        sync: false
+      - key: STAGE_DELAY         # seconds of visual pacing per stage in the live view
+        value: "0.45"

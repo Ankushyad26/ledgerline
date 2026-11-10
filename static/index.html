@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#F4F4F4" />
+  <title>Ledgerline · AP Invoice Agent</title>
+  <link rel="preload" href="/fonts/Inter-Variable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%230a0a0a'/><path d='M9 22h14M9 16h10M9 10h14' stroke='white' stroke-width='3' stroke-linecap='round'/></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/new">
+        <span class="logo"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#0a0a0a"/><path d="M9 22h14M9 16h10M9 10h14" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></span>
+        <span class="brand-name">Ledgerline</span>
+        <span class="brand-tag">AP digital employee</span>
+      </a>
+      <nav id="nav">
+        <a href="#/new" data-view="new">Process</a>
+        <a href="#/dashboard" data-view="dashboard">Dashboard</a>
+        <a href="#/ledger" data-view="ledger">PO ledger</a>
+        <a href="#/vendors" data-view="vendors">Vendors</a>
+        <a href="#/rules" data-view="rules">Rules</a>
+      </nav>
+      <div class="top-right">
+        <span class="ai-chip" id="ai-chip">…</span>
+        <button class="icon-btn" id="reset-btn" title="Reset demo data (restore master data, clear runs)">↺</button>
+        <a class="btn primary" href="#/new">Process invoice <span class="dither"></span></a>
+      </div>
+    </div>
+  </header>
+  <main id="app"></main>
+  <footer class="foot"><div class="foot-inner"><span id="company"></span><span class="eyebrow">AI reads · rules decide · humans own exceptions</span></div></footer>
+  <div id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+vendor_id,name,gstin,city,state,bank_name,bank_account,ifsc,email,status,status_note,payment_terms_days
+V001,Nimbus Office Supplies Pvt Ltd,27AABCN1234F1ZW,Mumbai,Maharashtra,HDFC Bank,50100234567890,HDFC0000123,accounts@nimbusoffice.in,active,,30
+V002,Orbit Systems India Pvt Ltd,29AACCO5678K1ZR,Bengaluru,Karnataka,ICICI Bank,002705001234,ICIC0000027,billing@orbitsystems.co.in,active,,45
+V003,Shakti Industrial Components,24ABAFS9012M1Z3,Ahmedabad,Gujarat,State Bank of India,30987654321,SBIN0001234,accounts@shaktiindustrial.com,active,,30
+V004,GreenLeaf Facility Services LLP,27AAJFG3456P1ZS,Pune,Maharashtra,Axis Bank,917020045678901,UTIB0000456,invoices@greenleaffs.in,active,,15
+V005,Apex Logistics Solutions Pvt Ltd,07AAKCA7890Q1ZP,New Delhi,Delhi,Kotak Mahindra Bank,4512345678,KKBK0000958,ar@apexlogistics.in,active,,30
+V006,Vertex Chemicals Ltd,24AABCV2468H1ZC,Vadodara,Gujarat,Bank of Baroda,11220100004455,BARB0VADODA,accounts@vertexchem.in,blocked,Blocked after failed compliance audit (Sep 2026),30

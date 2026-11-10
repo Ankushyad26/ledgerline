@@ -1,0 +1,4 @@
+vendor_id,invoice_number,invoice_date,po_number,subtotal,tax,total,source
+V001,NOS/2026/0877,2026-08-25,PO-0990,4000,720,4720,seed
+V002,ORB/26-27/0311,2026-10-02,PO-1002,960000,172800,1132800,seed
+V005,INV42,2026-10-20,PO-1007,40000,7200,47200,seed

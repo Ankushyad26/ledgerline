@@ -1,0 +1,15 @@
+po_number,vendor_id,po_date,status,gst_rate,description,receipt_required
+PO-0990,V001,2026-08-10,closed,18,Stationery top-up,1
+PO-1001,V001,2026-10-05,open,18,Q4 printing consumables,1
+PO-1002,V002,2026-09-15,open,18,Laptop refresh - engineering team,1
+PO-1003,V003,2026-10-12,open,18,Assembly line components,1
+PO-1004,V003,2026-10-12,open,18,Packaging material,1
+PO-1005,V004,2026-10-28,open,18,Housekeeping - Pune plant,0
+PO-1006,V004,2026-10-28,open,18,Pest control - Pune plant,0
+PO-1007,V005,2026-10-01,open,18,Outbound freight Pune-Delhi,0
+PO-1008,V001,2026-10-20,open,18,Office furniture,1
+PO-1009,V005,2026-10-25,open,18,Courier services,0
+PO-1010,V003,2026-10-30,open,18,Warehouse pallets,1
+PO-1011,V006,2026-08-01,open,18,Cleaning chemicals,1
+PO-1012,V002,2026-10-15,open,18,Monitors - design studio,1
+PO-1013,V003,2026-10-20,open,18,Maintenance spares kit,1

@@ -1,0 +1,28 @@
+{
+  "price_tolerance_pct": 2.0,
+  "amount_tolerance_pct": 1.0,
+  "amount_tolerance_abs": 2500,
+  "tax_rate_tolerance_pp": 0.5,
+  "rounding_tolerance": 1.0,
+  "max_invoice_age_days": 180,
+  "near_duplicate_window_days": 30,
+  "vendor_name_match_threshold": 85,
+  "line_match_threshold": 70,
+  "po_inference_min_confidence": 60,
+  "low_confidence_threshold": 0.6,
+  "payment_terms_days": 30,
+  "duplicate_rules": [
+    {
+      "rule": "Same vendor + same invoice number after normalising case, punctuation and leading zeros",
+      "action": "reject"
+    },
+    {
+      "rule": "Same file fingerprint (SHA-256) as an invoice already posted",
+      "action": "reject"
+    },
+    {
+      "rule": "Same vendor + same total within near_duplicate_window_days under a different number",
+      "action": "review"
+    }
+  ]
+}
