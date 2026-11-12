@@ -111,7 +111,7 @@ def ocr(path: str) -> tuple[str, float]:
         imgs = [Image.open(path)]
     else:
         with pdfplumber.open(path) as pdf:
-            imgs = [p.to_image(resolution=300).original.copy() for p in pdf.pages]
+            imgs = [p.to_image(resolution=int(os.environ.get('OCR_DPI', '300'))).original.copy() for p in pdf.pages]
     lines, confs = [], []
     for im in imgs:
         d = pytesseract.image_to_data(im.convert("L"), config="--psm 6", output_type=pytesseract.Output.DICT)
@@ -326,31 +326,45 @@ def compare(a: dict, b: dict) -> list[dict]:
 
 def extract(path: str, doc: dict, buyer_gstin: str) -> dict:
     """Returns {fields, method, reader, cross_check, warnings, ocr_text}"""
+    from concurrent.futures import ThreadPoolExecutor
     warnings = []
     text = doc["text"]
     reader = "text layer"
     ocr_conf = None
-    if doc["kind"] == "scanned":
+    scanned = doc["kind"] == "scanned"
+    pool = ThreadPoolExecutor(max_workers=1)
+    # For scans, OCR (CPU) runs in parallel with the AI call (network), so total time ~= the slower of the two.
+    ocr_job = pool.submit(ocr, path) if scanned else None
+
+    def ocr_result():
+        nonlocal text, reader, ocr_conf
+        if not ocr_job:
+            return
         try:
-            text, ocr_conf = ocr(path)
+            text, ocr_conf = ocr_job.result()
             reader = f"Tesseract OCR (mean word confidence {ocr_conf:.0%})"
         except Exception as e:  # noqa: BLE001
             warnings.append(f"OCR unavailable: {e}")
             text = ""
-    rules = normalise(rule_parse(text, buyer_gstin)) if text.strip() else None
+
+    rules = normalise(rule_parse(text, buyer_gstin)) if (not scanned and text.strip()) else None
 
     ai = None
-    if llm.provider() and llm.paused() and doc["kind"] == "digital" and rules:
+    if llm.provider() and llm.paused() and not scanned and rules:
         # circuit breaker: the AI just failed; don't make every invoice wait for it again
         warnings.append(f"AI extraction failed (AI reader paused for {llm.paused()}s after the service was "
                         "overloaded, HTTP 503); fell back to rule parser")
     elif llm.provider():
+        budget = (20 if rules else None) if not scanned else (15 if llm.paused() else None)
         try:
             with open(path, "rb") as fh:
-                ai = normalise(llm.extract(fh.read(), doc["mime"], SCHEMA_PROMPT,
-                                           budget=20 if (doc["kind"] == "digital" and rules) else None))
+                ai = normalise(llm.extract(fh.read(), doc["mime"], SCHEMA_PROMPT, budget=budget))
         except Exception as e:  # noqa: BLE001
             warnings.append(f"AI extraction failed ({type(e).__name__}: {str(e)[:120]}); fell back to rule parser")
+    if scanned:
+        ocr_result()
+        rules = normalise(rule_parse(text, buyer_gstin)) if text.strip() else None
+    pool.shutdown(wait=False)
 
     if ai:
         desc = llm.describe()
