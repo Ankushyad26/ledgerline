@@ -395,6 +395,18 @@ def _run(R, run, buyer, ctx):
             checks.append(check("NO_OCR_CROSSCHECK", "info", "OCR cross-check skipped",
                                 "Tesseract isn't installed on this machine, so the AI read could not be compared with "
                                 "an independent OCR read. Confidence and arithmetic checks still apply."))
+        elif w.startswith("AI extraction failed"):
+            why = ("overloaded (HTTP 503)" if "503" in w else "rate-limited (HTTP 429)" if "429" in w
+                   else "too slow to answer" if ("slow" in w or "Timeout" in w) else "unavailable")
+            if doc["kind"] == "digital":
+                # digital PDF: the text-layer parser is exact, and the checks below verify every value
+                checks.append(check("AI_FALLBACK", "info", "AI reader busy — read from the PDF's text layer instead",
+                                    f"The AI service was {why}, so the built-in parser read this digital PDF. "
+                                    "Arithmetic and master-data checks below verify the values."))
+            else:
+                checks.append(check("AI_FALLBACK", "warn", "AI reader busy — read with OCR instead",
+                                    f"The AI service was {why}, so Tesseract OCR read this scan. "
+                                    "Verify the key fields against the document."))
         else:
             checks.append(check("EXTRACT_WARN", "warn", "Extraction fallback used", w))
     fc = f.get("field_confidence") or {}
