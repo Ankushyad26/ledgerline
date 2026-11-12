@@ -12,6 +12,14 @@ import httpx
 
 TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "25"))          # per request
 BUDGET = float(os.environ.get("LLM_BUDGET", "45"))            # whole AI read, incl. retries + backups
+COOLDOWN = float(os.environ.get("LLM_COOLDOWN", "120"))       # circuit breaker: pause the AI after it fails
+_paused_until = 0.0
+
+
+def paused() -> int:
+    """Seconds left on the circuit-breaker pause (0 = AI available)."""
+    import time
+    return max(0, int(_paused_until - time.time()))
 
 MODELS = {
     "gemini": os.environ.get("GEMINI_MODEL", "gemini-3.6-flash"),
@@ -56,6 +64,7 @@ def extract(file_bytes: bytes, mime: str, prompt: str, budget: float | None = No
     """Call the provider with retries (busy / rate-limited / network errors) and backup models,
     within a fixed time budget, so a slow AI service can never stall the invoice queue."""
     import time
+    global _paused_until
     deadline = time.time() + (budget or BUDGET)
     p = provider()
     if not p:
@@ -67,9 +76,12 @@ def extract(file_bytes: bytes, mime: str, prompt: str, budget: float | None = No
         for attempt in range(tries):
             left = deadline - time.time()
             if left < 4:
+                _paused_until = time.time() + COOLDOWN
                 raise RuntimeError(f"{p} too slow — time budget used up ({last})")
             try:
-                return _call(p, model, file_bytes, mime, prompt, timeout=min(TIMEOUT, left))
+                out = _call(p, model, file_bytes, mime, prompt, timeout=min(TIMEOUT, left))
+                _paused_until = 0.0
+                return out
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code
                 last = f"{model}: HTTP {code} {e.response.text[:120]}"
@@ -82,6 +94,7 @@ def extract(file_bytes: bytes, mime: str, prompt: str, budget: float | None = No
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 last = f"{model}: {type(e).__name__}"
                 time.sleep(min(1.5 * (attempt + 1), max(0, deadline - time.time() - 4)))
+    _paused_until = time.time() + COOLDOWN
     raise RuntimeError(f"{p} unavailable after retries and backup models ({last})")
 
 

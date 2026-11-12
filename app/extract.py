@@ -340,7 +340,11 @@ def extract(path: str, doc: dict, buyer_gstin: str) -> dict:
     rules = normalise(rule_parse(text, buyer_gstin)) if text.strip() else None
 
     ai = None
-    if llm.provider():
+    if llm.provider() and llm.paused() and doc["kind"] == "digital" and rules:
+        # circuit breaker: the AI just failed; don't make every invoice wait for it again
+        warnings.append(f"AI extraction failed (AI reader paused for {llm.paused()}s after the service was "
+                        "overloaded, HTTP 503); fell back to rule parser")
+    elif llm.provider():
         try:
             with open(path, "rb") as fh:
                 ai = normalise(llm.extract(fh.read(), doc["mime"], SCHEMA_PROMPT,
