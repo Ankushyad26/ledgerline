@@ -738,6 +738,8 @@ def _decide(R, run, ctx, f, vendor, po, rows, alloc, buyer, summ=None):
     R.start("action")
     blocks, email, routing = [], None, []
     due = None
+    if decision == "APPROVED" and not db.get_run(R.rid):
+        return   # run was deleted by a reset while it was processing: never post it to the fresh ledger
     if decision == "APPROVED":
         db.post_invoice(vendor["vendor_id"], f.get("invoice_number"), f.get("invoice_date"), po["po_number"],
                         ctx["net"], f.get("tax_total") or 0, f.get("total"), R.rid, run["file_hash"], alloc)
@@ -871,10 +873,26 @@ def _worker():
     while True:
         rid = _q.get()
         try:
-            db.update_run(rid, status="running")
-            run_pipeline(rid)
+            if db.claim(rid):          # skip duplicates in the queue and runs removed by a reset
+                run_pipeline(rid)
         finally:
             _q.task_done()
+
+
+def clear_queue():
+    """Drop every waiting job (used by reset)."""
+    with _q.mutex:
+        n = len(_q.queue)
+        _q.queue.clear()
+        _q.unfinished_tasks = max(0, _q.unfinished_tasks - n)
+        _q.all_tasks_done.notify_all()
+
+
+def requeue_unfinished():
+    """After a server restart, put runs that were waiting or mid-way back in the queue."""
+    for r in db.q("SELECT id FROM runs WHERE status IN ('queued','running') ORDER BY seq"):
+        db.update_run(r["id"], status="queued")
+        enqueue(r["id"])
 
 
 def queue_position(rid: str) -> int | None:

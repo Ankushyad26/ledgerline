@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   id INTEGER PRIMARY KEY AUTOINCREMENT, vendor_id TEXT, invoice_number TEXT, invoice_number_norm TEXT,
   invoice_date TEXT, po_number TEXT, subtotal REAL, tax REAL, total REAL, source TEXT, run_id TEXT,
   file_hash TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v INTEGER);
 CREATE TABLE IF NOT EXISTS runs (
   id TEXT PRIMARY KEY, seq INTEGER, created_at TEXT, filename TEXT, source TEXT, file_path TEXT, file_hash TEXT,
   status TEXT, decision TEXT, vendor_name TEXT, vendor_id TEXT, invoice_number TEXT, total REAL,
@@ -175,13 +176,22 @@ def post_invoice(vendor_id, invoice_number, invoice_date, po_number, subtotal, t
 # ------------------------------------------------------------------ runs
 def new_run(filename, source, file_path, file_hash, status="queued"):
     with _lock:
-        seq = (q1("SELECT MAX(seq) m FROM runs")["m"] or 0) + 1
+        # run numbers are never reused (not even after a reset), so a stale job can't touch a new run
+        last = max((q1("SELECT v FROM meta WHERE k='run_seq'") or {"v": 0})["v"], q1("SELECT MAX(seq) m FROM runs")["m"] or 0)
+        seq = last + 1
+        x("INSERT OR REPLACE INTO meta (k, v) VALUES ('run_seq', ?)", (seq,))
         rid = f"RUN-{seq:04d}"
         x("INSERT INTO runs (id, seq, created_at, filename, source, file_path, file_hash, status, stages, audit)"
           " VALUES (?,?,?,?,?,?,?,?,?,?)",
           (rid, seq, datetime.now().isoformat(timespec="seconds"), filename, source, file_path, file_hash,
            status, "[]", "[]"))
         return rid
+
+
+def claim(rid) -> bool:
+    """Atomically move a run from queued to running. False if it was already taken or no longer exists."""
+    with _lock:
+        return x("UPDATE runs SET status='running' WHERE id=? AND status='queued'", (rid,)).rowcount == 1
 
 
 def update_run(rid, **fields):

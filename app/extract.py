@@ -343,7 +343,8 @@ def extract(path: str, doc: dict, buyer_gstin: str) -> dict:
     if llm.provider():
         try:
             with open(path, "rb") as fh:
-                ai = normalise(llm.extract(fh.read(), doc["mime"], SCHEMA_PROMPT))
+                ai = normalise(llm.extract(fh.read(), doc["mime"], SCHEMA_PROMPT,
+                                           budget=20 if (doc["kind"] == "digital" and rules) else None))
         except Exception as e:  # noqa: BLE001
             warnings.append(f"AI extraction failed ({type(e).__name__}: {str(e)[:120]}); fell back to rule parser")
 

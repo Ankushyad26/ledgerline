@@ -10,7 +10,8 @@ import re
 
 import httpx
 
-TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "60"))
+TIMEOUT = float(os.environ.get("LLM_TIMEOUT", "25"))          # per request
+BUDGET = float(os.environ.get("LLM_BUDGET", "45"))            # whole AI read, incl. retries + backups
 
 MODELS = {
     "gemini": os.environ.get("GEMINI_MODEL", "gemini-3.6-flash"),
@@ -51,9 +52,11 @@ def _parse_json(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-def extract(file_bytes: bytes, mime: str, prompt: str) -> dict:
-    """Call the provider with retries (busy / rate-limited / network errors) and backup models."""
+def extract(file_bytes: bytes, mime: str, prompt: str, budget: float | None = None) -> dict:
+    """Call the provider with retries (busy / rate-limited / network errors) and backup models,
+    within a fixed time budget, so a slow AI service can never stall the invoice queue."""
     import time
+    deadline = time.time() + (budget or BUDGET)
     p = provider()
     if not p:
         raise RuntimeError("no LLM provider configured")
@@ -62,27 +65,31 @@ def extract(file_bytes: bytes, mime: str, prompt: str) -> dict:
     for mi, model in enumerate(models):
         tries = ATTEMPTS if mi == 0 else 2
         for attempt in range(tries):
+            left = deadline - time.time()
+            if left < 4:
+                raise RuntimeError(f"{p} too slow — time budget used up ({last})")
             try:
-                return _call(p, model, file_bytes, mime, prompt)
+                return _call(p, model, file_bytes, mime, prompt, timeout=min(TIMEOUT, left))
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code
                 last = f"{model}: HTTP {code} {e.response.text[:120]}"
                 if code == 404:
                     break                                   # model id not available -> next model
                 if code in RETRY_STATUS:
-                    time.sleep(1.5 * (attempt + 1))         # busy / rate-limited -> back off and retry
+                    time.sleep(min(1.5 * (attempt + 1), max(0, deadline - time.time() - 4)))
                     continue
                 raise RuntimeError(f"{p} API error {code}: {e.response.text[:160]}") from e
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 last = f"{model}: {type(e).__name__}"
-                time.sleep(1.5 * (attempt + 1))
+                time.sleep(min(1.5 * (attempt + 1), max(0, deadline - time.time() - 4)))
     raise RuntimeError(f"{p} unavailable after retries and backup models ({last})")
 
 
 LAST_MODEL = {}
 
 
-def _call(p, model, file_bytes, mime, prompt) -> dict:
+def _call(p, model, file_bytes, mime, prompt, timeout=None) -> dict:
+    timeout = timeout or TIMEOUT
     LAST_MODEL[p] = model
     b64 = base64.b64encode(file_bytes).decode()
     key = os.environ[KEYS[p]]
@@ -91,7 +98,7 @@ def _call(p, model, file_bytes, mime, prompt) -> dict:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         body = {"contents": [{"parts": [{"inline_data": {"mime_type": mime, "data": b64}}, {"text": prompt}]}],
                 "generationConfig": {"responseMimeType": "application/json"}}
-        r = httpx.post(url, params={"key": key}, json=body, timeout=TIMEOUT)
+        r = httpx.post(url, params={"key": key}, json=body, timeout=timeout)
         r.raise_for_status()
         text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
         return _parse_json(text)
@@ -102,7 +109,7 @@ def _call(p, model, file_bytes, mime, prompt) -> dict:
                  {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}})
         body = {"model": model, "max_tokens": 4000,
                 "messages": [{"role": "user", "content": [block, {"type": "text", "text": prompt}]}]}
-        r = httpx.post("https://api.anthropic.com/v1/messages", json=body, timeout=TIMEOUT,
+        r = httpx.post("https://api.anthropic.com/v1/messages", json=body, timeout=timeout,
                        headers={"x-api-key": key, "anthropic-version": "2023-06-01"})
         r.raise_for_status()
         text = "".join(b.get("text", "") for b in r.json()["content"])
@@ -114,7 +121,7 @@ def _call(p, model, file_bytes, mime, prompt) -> dict:
                 {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
         body = {"model": model, "temperature": 0, "response_format": {"type": "json_object"},
                 "messages": [{"role": "user", "content": [part, {"type": "text", "text": prompt}]}]}
-        r = httpx.post("https://api.openai.com/v1/chat/completions", json=body, timeout=TIMEOUT,
+        r = httpx.post("https://api.openai.com/v1/chat/completions", json=body, timeout=timeout,
                        headers={"Authorization": f"Bearer {key}"})
         r.raise_for_status()
         return _parse_json(r.json()["choices"][0]["message"]["content"])

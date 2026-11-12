@@ -38,6 +38,7 @@ app = FastAPI(title="Ledgerline AP Agent")
 @app.on_event("startup")
 def _startup():
     db.conn()
+    pipeline.requeue_unfinished()
 
 
 def _start(path, filename, source):
@@ -267,6 +268,7 @@ def config():
 
 @app.post("/api/reset")
 def reset():
+    pipeline.clear_queue()
     db.load_seed(clear_runs=True)
     for fn in os.listdir(db.UPLOADS):
         try:
